@@ -31,6 +31,17 @@ class TeamsCloudAdapter extends EventEmitter {
 }
 describe('Initialize Adapter', () => {
     it('Should initialize adapter', async () => {
+        const originalEnv = {
+            TEAMS_BOT_APP_ID: process.env.TEAMS_BOT_APP_ID,
+            TEAMS_BOT_CLIENT_SECRET: process.env.TEAMS_BOT_CLIENT_SECRET,
+            TEAMS_BOT_TENANT_ID: process.env.TEAMS_BOT_TENANT_ID,
+            TEAMS_BOT_APP_TYPE: process.env.TEAMS_BOT_APP_TYPE
+        }
+        process.env.TEAMS_BOT_APP_ID = 'test-app-id'
+        process.env.TEAMS_BOT_CLIENT_SECRET = 'test-secret'
+        process.env.TEAMS_BOT_TENANT_ID = 'test-tenant-id'
+        process.env.TEAMS_BOT_APP_TYPE = 'SingleTenant'
+
         process.env.PORT = 0
         const robot = new Robot(init, true, 'test-bot', null)
         robot.config = {
@@ -55,6 +66,10 @@ describe('Initialize Adapter', () => {
         } catch (error) {
             actual = error.message
         } finally {
+            process.env.TEAMS_BOT_APP_ID = originalEnv.TEAMS_BOT_APP_ID
+            process.env.TEAMS_BOT_CLIENT_SECRET = originalEnv.TEAMS_BOT_CLIENT_SECRET
+            process.env.TEAMS_BOT_TENANT_ID = originalEnv.TEAMS_BOT_TENANT_ID
+            process.env.TEAMS_BOT_APP_TYPE = originalEnv.TEAMS_BOT_APP_TYPE
             robot.shutdown()
         }
     })

@@ -1,11 +1,12 @@
 import { MsTeamsAdapter } from './src/MsTeamsAdapter.mjs'
-import {
-    CloudAdapter,
-    ConfigurationServiceClientCredentialFactory,
-    createBotFrameworkAuthenticationFromConfiguration,
-    ActivityHandler,
-} from 'botbuilder'
+import { ActivityHandler } from 'botbuilder'
 import { TextMessage, User } from 'hubot'
+import { BotBuilderPlugin } from '@microsoft/teams.botbuilder'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const { Client } = require('@microsoft/teams.common/http')
+const { ConsoleLogger } = require('@microsoft/teams.common/logging')
 
 const defaultMessageMapper = context => {
 
@@ -77,16 +78,32 @@ export default {
             TEAMS_BOT_APP_ID: process.env.TEAMS_BOT_APP_ID ?? null,
             TEAMS_BOT_APP_TYPE: process.env.TEAMS_BOT_APP_TYPE ?? null
         }
-        const credentials = new ConfigurationServiceClientCredentialFactory({
-            MicrosoftAppId: process.env.TEAMS_BOT_APP_ID,
-            MicrosoftAppPassword: process.env.TEAMS_BOT_CLIENT_SECRET,
-            MicrosoftAppType: process.env.TEAMS_BOT_APP_TYPE ?? 'MultiTenant',
-            MicrosoftAppTenantId: process.env.TEAMS_BOT_TENANT_ID
-        })
-        const auth = createBotFrameworkAuthenticationFromConfiguration(null, credentials)
-        const client = new CloudAdapter(auth)
         const activityHandler = new HubotActivityHandler(robot)
-        const adapter = new MsTeamsAdapter(robot, activityHandler, client)
+        const plugin = new BotBuilderPlugin({ handler: activityHandler })
+        const tenantId = (process.env.TEAMS_BOT_APP_TYPE ?? '').toLowerCase() === 'singletenant'
+            ? process.env.TEAMS_BOT_TENANT_ID
+            : undefined
+
+        plugin.logger = new ConsoleLogger('@hubot-friends/hubot-ms-teams')
+        plugin.client = new Client({
+            headers: {
+                'User-Agent': '@hubot-friends/hubot-ms-teams'
+            }
+        })
+        plugin.manifest = {
+            name: {
+                short: robot.name,
+                full: robot.name
+            }
+        }
+        plugin.credentials = {
+            clientId: process.env.TEAMS_BOT_APP_ID,
+            clientSecret: process.env.TEAMS_BOT_CLIENT_SECRET,
+            tenantId
+        }
+        plugin.onInit()
+
+        const adapter = new MsTeamsAdapter(robot, activityHandler, plugin.adapter)
         return adapter
     }
 }
