@@ -195,6 +195,104 @@ describe('MS Teams Adapter', () => {
         assert.deepEqual(wasCalled, true)
     })
 
+    it('Responds to Teams group chat mentions', async () => {
+        let wasCalled = false
+        robot.adapter.on('sendActivity', context => {
+            assert.equal(context.text, 'Group hello')
+        })
+        robot.respond(/group hello$/i, async (res) => {
+            assert.equal(res.message.text, '@test-bot group hello')
+            wasCalled = true
+            await res.reply('Group hello')
+        })
+        const response = await fetch(`http://127.0.0.1:${robot.server.address().port}/api/messages`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                text: '<at>test-bot</at> group hello',
+                channelId: 'msteams',
+                id: 'group-chat-message',
+                type: 'message',
+                from: {
+                    id: 'group-user',
+                    name: 'group-user-name'
+                },
+                recipient: {
+                    id: '888adsjjdskueu',
+                    name: 'test-bot'
+                },
+                entities: [{
+                    type: 'mention',
+                    text: '<at>test-bot</at>',
+                    mentioned: {
+                        id: '888adsjjdskueu',
+                        name: 'test-bot'
+                    }
+                }],
+                conversation: {
+                    isGroup: true,
+                    conversationType: 'groupChat',
+                    id: '19:group-chat',
+                    tenantId: 'test-tenant-id'
+                }
+            })
+        })
+
+        assert.equal(response.status, 200)
+        assert.deepEqual(wasCalled, true)
+    })
+
+    it('Responds to Teams meeting chat mentions', async () => {
+        let wasCalled = false
+        robot.adapter.on('sendActivity', context => {
+            assert.equal(context.text, 'Meeting hello')
+        })
+        robot.respond(/meeting hello$/i, async (res) => {
+            assert.equal(res.message.text, '@test-bot meeting hello')
+            wasCalled = true
+            await res.reply('Meeting hello')
+        })
+        const response = await fetch(`http://127.0.0.1:${robot.server.address().port}/api/messages`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                text: '<at>test-bot</at> meeting hello',
+                channelId: 'msteams',
+                id: 'meeting-chat-message',
+                type: 'message',
+                from: {
+                    id: 'meeting-user',
+                    name: 'meeting-user-name'
+                },
+                recipient: {
+                    id: '888adsjjdskueu',
+                    name: 'test-bot'
+                },
+                entities: [{
+                    type: 'mention',
+                    text: '<at>test-bot</at>',
+                    mentioned: {
+                        id: '888adsjjdskueu',
+                        name: 'test-bot'
+                    }
+                }],
+                conversation: {
+                    isGroup: true,
+                    conversationType: 'meeting',
+                    id: '19:meeting-chat',
+                    tenantId: 'test-tenant-id'
+                }
+            })
+        })
+
+        assert.equal(response.status, 200)
+        assert.deepEqual(wasCalled, true)
+    })
+
     it('Responds to a private or Direct Message', async () => {
         let wasCalled = false
         robot.respond(/lunch/i, async (res) => {
