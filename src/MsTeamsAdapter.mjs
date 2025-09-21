@@ -6,24 +6,9 @@ import {
     TextFormatTypes,
     TurnContext
 } from 'botbuilder'
+import { MessageActivity } from '@microsoft/teams.api'
 
 const CONTENT_LENGTH_LIMIT = 2_000
-const conversationTypeMiddleware = {
-    personal(body, robot) {
-        const robotName = (robot.alias == false ? undefined : robot.alias) ?? robot.name
-        if (robotName == body.recipient.name && body.text.indexOf(`@${robotName} ` == -1)) {
-            body.text = `@${robotName} ${body.text}`
-        }
-        return body
-    },
-    channel(body, robot) {
-        const robotName = (robot.alias == false ? undefined : robot.alias) ?? robot.name
-        if (body.text.indexOf(`@${robotName} `) == -1) {
-            body.text = `@${robotName} ${body.text}`
-        }
-        return body
-    }
-}
 
 class MsTeamsAdapter extends Adapter {
     #client
@@ -160,12 +145,68 @@ class MsTeamsAdapter extends Adapter {
         }
         return responses
     }
-    #transformSoHubotCanRecognizeIt(text, robotName) {
-        if(!text) return text
-        return text.replace(/^\r\n/, '')
-        .replace(/\\n$/, '')
-        .replace(`<at>${robotName}</at> `, `@${robotName} `)
-        .trim()
+    #escapeRegex(value) {
+        return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    }
+
+    #ensureMentionPrefix(text, robotName) {
+        if (!robotName) {
+            return text?.trim() ?? text
+        }
+        const trimmed = (text ?? '').trim()
+        if (!trimmed) {
+            return `@${robotName}`
+        }
+        const mentionPattern = new RegExp(`^@${this.#escapeRegex(robotName)}\\b`, 'i')
+        if (mentionPattern.test(trimmed)) {
+            return trimmed.replace(mentionPattern, `@${robotName}`)
+        }
+        const barePattern = new RegExp(`^${this.#escapeRegex(robotName)}\\b`, 'i')
+        if (barePattern.test(trimmed)) {
+            return trimmed.replace(barePattern, `@${robotName}`)
+        }
+        return `@${robotName} ${trimmed}`
+    }
+
+    #normalizeIncomingActivity(activity) {
+        const robotName = (this.robot.alias == false ? undefined : this.robot.alias) ?? this.robot.name
+        if (!activity || typeof activity !== 'object') {
+            return activity
+        }
+
+        const messageActivity = MessageActivity.from(activity)
+        const botAccountId = messageActivity.recipient?.id
+
+        if (messageActivity.text) {
+            if (botAccountId) {
+                messageActivity.stripMentionsText({ accountId: botAccountId, tagOnly: true })
+            } else {
+                messageActivity.stripMentionsText({ tagOnly: true })
+            }
+        }
+
+        let normalizedText = (messageActivity.text ?? '')
+            .replace(/^\r?\n/, '')
+            .replace(/\\n$/, '')
+            .trim()
+
+        let mentionDetected = false
+
+        if (normalizedText.includes('<at>')) {
+            mentionDetected = true
+            normalizedText = normalizedText.replace(/<at>(.*?)<\/at>/gi, '$1')
+        }
+
+        const isPersonal = activity?.conversation?.conversationType === 'personal'
+        const botMention = botAccountId ? messageActivity.getAccountMention(botAccountId) : null
+        mentionDetected = mentionDetected || !!botMention
+
+        if ((isPersonal || mentionDetected) && robotName && normalizedText.length > 0) {
+            normalizedText = this.#ensureMentionPrefix(normalizedText, robotName)
+        }
+
+        activity.text = normalizedText
+        return activity
     }
     async run() {
         this.robot.router.use(async (req, res, next) => {
@@ -175,19 +216,9 @@ class MsTeamsAdapter extends Adapter {
             next()
         })
         this.robot.router.post(['/', '/api/messages'], async (req, res)=>{
-            const robotName = (this.robot.alias == false ? undefined : this.robot.alias) ?? this.robot.name
-            // The text coming from Teams looks something like <at>test-bot</at> if it's
-            // directed to a user. We need to convert that to @test-bot for Hubot to
-            // recognize it.
-            req.body.text = this.#transformSoHubotCanRecognizeIt(req.body.text, robotName)
-            
-            // If the incoming message is a conversation, then the text is in a different structure.
-            // We need to extract it and transform it as well.
-            if(conversationTypeMiddleware[req.body?.conversation?.conversationType]) {
-                req.body = conversationTypeMiddleware[req.body.conversation.conversationType](req.body, this.robot)
-            }
-            
-            try { 
+            req.body = this.#normalizeIncomingActivity(req.body)
+
+            try {
                 await this.#client.process(req, res, async context => {
                     // Store conversation reference for messageRoom functionality
                     const conversationReference = TurnContext.getConversationReference(context.activity)

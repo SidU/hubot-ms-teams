@@ -2,6 +2,8 @@
 
 This is a [MS Teams Adapter](https://dev.botframework.com) for [Hubot](https://github.com/hubotio/hubot/), a popular chatbot framework. With this adapter, you can connect your Hubot instance to MS Teams and interact with users through chat.
 
+> ℹ️ **New in this release**: the adapter now boots on top of the [Teams AI library for TypeScript v2](https://github.com/microsoft/teams.ts). The SDK requires Node.js 20 or later, so make sure your runtime satisfies that requirement before upgrading.
+
 ## TLDR; Expert Summary
 
 - Create a Hubot codebase locally with `npx hubot --create . -a @hubot-friends/hubot-ms-teams`
