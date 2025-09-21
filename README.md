@@ -46,6 +46,26 @@ Replace `<...>` with your values.
 
 Once your Hubot instance is running, you can interact with it through chat in a channel you've added Hubot to.
 
+## Agent Toolkit Bootstrapper
+
+This package now ships with an Agent Toolkit (ATK) bootstrap command that scaffolds a complete Hubot + Teams project with local debugging, deployment scripts, and manifest updates. Run the generator from an empty folder or inside an existing Hubot project:
+
+```sh
+npx hubot-ms-teams atk.basic --create-hubot --language ts
+```
+
+Key options:
+
+| Option | Description |
+| --- | --- |
+| `--create-hubot` | Adds a Hubot skeleton if the current folder is empty. |
+| `--language <ts|js>` | Force the project language (auto-detected when omitted). |
+| `--subscription` / `--resource-group` / `--location` | Azure provisioning defaults. |
+| `--app-id` | Reuse an existing Bot App registration when available. |
+| `--yes` | Accept defaults without interactive prompts. |
+
+After the command completes, open the folder in VS Code and press **F5** to launch the bot with ATK. Environment variables are stored under `env/.env.local` and excluded from source control. Deployment helper scripts are available via `npm run provision:dev` and `npm run deploy:dev`.
+
 ## Local Development
 
 Make a directory for your Hubot and run the following in it:
